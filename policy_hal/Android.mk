@@ -26,7 +26,8 @@ LOCAL_C_INCLUDES := $(TOPDIR)frameworks/av/services \
                     $(TOPDIR)frameworks/av/services/audiopolicy/engine/interface \
                     $(TOPDIR)frameworks/av/services/audiopolicy \
                     $(TOPDIR)frameworks/av/services/audiopolicy/common/managerdefinitions/include \
-                    $(call include-path-for, avextension)
+                    $(call include-path-for, avextension) \
+                    $(TOPDIR)system/core/base/include
 
 
 LOCAL_SHARED_LIBRARIES := \
@@ -41,7 +42,6 @@ LOCAL_STATIC_LIBRARIES := \
     libmedia_helper \
 
 LOCAL_CFLAGS += -Wall -Werror
-LOCAL_CLANG_CFLAGS += -Wno-overloaded-virtual -Wno-unused-variable -Wno-unused-private-field 
 
 ifeq ($(strip $(AUDIO_FEATURE_ENABLED_VOICE_CONCURRENCY)),true)
 LOCAL_CFLAGS += -DVOICE_CONCURRENCY
