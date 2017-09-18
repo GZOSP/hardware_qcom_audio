@@ -1277,12 +1277,6 @@ int get_snd_codec_id(audio_format_t format)
     case AUDIO_FORMAT_IEC61937:
         id = SND_AUDIOCODEC_IEC61937;
         break;
-    case AUDIO_FORMAT_DSD:
-        id = SND_AUDIOCODEC_DSD;
-        break;
-    case AUDIO_FORMAT_APTX:
-        id = SND_AUDIOCODEC_APTX;
-        break;
     default:
         ALOGE("%s: Unsupported audio format :%x", __func__, format);
     }
