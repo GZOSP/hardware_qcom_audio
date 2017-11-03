@@ -139,6 +139,10 @@ vendor.audio.dolby.ds2.enabled=true
 PRODUCT_PROPERTY_OVERRIDES += \
 persist.vendor.bt.enable.splita2dp=false
 
+#split  a2dp
+PRODUCT_PROPERTY_OVERRIDES += \
+persist.vendor.bt.enable.splita2dp=false
+
 PRODUCT_PACKAGES += \
     android.hardware.audio@2.0-service \
     android.hardware.audio@2.0-impl \
