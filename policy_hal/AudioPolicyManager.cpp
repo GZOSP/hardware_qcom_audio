@@ -1997,10 +1997,10 @@ status_t AudioPolicyManagerCustom::stopInput(audio_io_handle_t input,
 }
 
 AudioPolicyManagerCustom::AudioPolicyManagerCustom(AudioPolicyClientInterface *clientInterface)
-    : AudioPolicyManager(clientInterface),
+    : AudioPolicyManager(clientInterface)
 #ifdef FM_POWER_OPT
-      mPrevFMVolumeDb(0.0f),
-      mFMIsActive(false)
+      , mPrevFMVolumeDb(0.0f)
+      , mFMIsActive(false)
 #endif
 {
 
