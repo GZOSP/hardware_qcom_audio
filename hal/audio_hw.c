@@ -351,7 +351,9 @@ const char * const use_case_table[AUDIO_USECASE_MAX] = {
     [USECASE_AUDIO_PLAYBACK_INTERACTIVE_STREAM7] = "audio-interactive-stream7",
     [USECASE_AUDIO_PLAYBACK_INTERACTIVE_STREAM8] = "audio-interactive-stream8",
 
-    [USECASE_AUDIO_EC_REF_LOOPBACK] = "ec-ref-audio-capture"
+    [USECASE_AUDIO_EC_REF_LOOPBACK] = "ec-ref-audio-capture",
+
+    [USECASE_AUDIO_A2DP_ABR_FEEDBACK] = "a2dp-abr-feedback"
 };
 
 static const audio_usecase_t offload_usecases[] = {
@@ -4520,7 +4522,7 @@ exit:
                             out_get_sample_rate(&out->stream.common));
 
         if (audio_extn_passthru_is_passthrough_stream(out)) {
-                ALOGE("%s: write error, ret = %d", __func__,(int) ret);
+                //ALOGE("%s: write error, ret = %zd", __func__, ret);
                 ATRACE_END();
                 return ret;
         }
@@ -4651,43 +4653,27 @@ static int out_get_presentation_position(const struct audio_stream_out *stream,
         clock_gettime(CLOCK_MONOTONIC, timestamp);
     } else {
         if (out->pcm) {
-            int64_t signed_frames = -1;
-            // XXX it might be better to identify these
-            // as realtime usecases?
-            if (out->usecase == USECASE_AUDIO_PLAYBACK_MMAP ||
-                out->usecase == USECASE_AUDIO_PLAYBACK_ULL) {
-                unsigned int hw_ptr;
-                if (pcm_mmap_get_hw_ptr(out->pcm, &hw_ptr, timestamp) == 0) {
-                    signed_frames = hw_ptr;
-                }
-                ALOGV("%s frames %lld", __func__, (long long)signed_frames);
-            } else {
-                unsigned int avail;
-                if (pcm_get_htimestamp(out->pcm, &avail, timestamp) == 0) {
-                    size_t kernel_buffer_size =
-                            out->config.period_size * out->config.period_count;
-                     signed_frames =
-                            out->written - kernel_buffer_size + avail;
-                }
-            }
-
-            // This adjustment accounts for buffering after app processor.
-            // It is based on estimated DSP latency per use case, rather than exact.
-            signed_frames -=
-                    (platform_render_latency(out->usecase) *
-                     out->sample_rate / 1000000LL);
-
-            // Adjustment accounts for A2dp encoder latency with non offload usecases
-            // Note: Encoder latency is returned in ms, while platform_render_latency in us.
-            if (AUDIO_DEVICE_OUT_ALL_A2DP & out->devices) {
+            unsigned int avail;
+            if (pcm_get_htimestamp(out->pcm, &avail, timestamp) == 0) {
+                size_t kernel_buffer_size = out->config.period_size * out->config.period_count;
+                int64_t signed_frames = out->written - kernel_buffer_size + avail;
+                // This adjustment accounts for buffering after app processor.
+                // It is based on estimated DSP latency per use case, rather than exact.
                 signed_frames -=
-                        (audio_extn_a2dp_get_encoder_latency() * out->sample_rate / 1000);
-            }
+                        (platform_render_latency(out->usecase) * out->sample_rate / 1000000LL);
 
-            // It would be unusual for this value to be negative, but check just in case ...
-            if (signed_frames >= 0) {
-                *frames = signed_frames;
-                ret = 0;
+                // Adjustment accounts for A2dp encoder latency with non offload usecases
+                // Note: Encoder latency is returned in ms, while platform_render_latency in us.
+                if (AUDIO_DEVICE_OUT_ALL_A2DP & out->devices) {
+                    signed_frames -=
+                            (audio_extn_a2dp_get_encoder_latency() * out->sample_rate / 1000);
+                }
+
+                // It would be unusual for this value to be negative, but check just in case ...
+                if (signed_frames >= 0) {
+                    *frames = signed_frames;
+                    ret = 0;
+                }
             }
         } else if (out->card_status == CARD_STATUS_OFFLINE) {
             *frames = out->written;
