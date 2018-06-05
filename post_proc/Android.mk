@@ -16,6 +16,10 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_CFLAGS+= -O2 -fvisibility=hidden
 
+ifneq ($(filter msm8916,$(TARGET_BOARD_PLATFORM)),)
+    LOCAL_CFLAGS += -DPLATFORM_MSM8916
+endif
+
 LOCAL_SHARED_LIBRARIES := \
 	libcutils \
 	liblog \
