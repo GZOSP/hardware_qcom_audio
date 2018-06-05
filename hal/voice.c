@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  * Not a contribution.
  *
  * Copyright (C) 2013 The Android Open Source Project
@@ -56,9 +56,62 @@ static struct voice_session *voice_get_session_from_use_case(struct audio_device
     return session;
 }
 
+static bool voice_is_sidetone_device(snd_device_t out_device,
+            char *mixer_path)
+{
+    bool is_sidetone_dev;
+
+    switch (out_device) {
+    case SND_DEVICE_OUT_VOICE_HANDSET:
+        is_sidetone_dev = true;
+        strlcpy(mixer_path, "sidetone-handset", MIXER_PATH_MAX_LENGTH);
+        break;
+    case SND_DEVICE_OUT_VOICE_HEADPHONES:
+    case SND_DEVICE_OUT_VOICE_ANC_HEADSET:
+    case SND_DEVICE_OUT_VOICE_ANC_FB_HEADSET:
+        is_sidetone_dev = true;
+        strlcpy(mixer_path, "sidetone-headphones", MIXER_PATH_MAX_LENGTH);
+        break;
+    default:
+        is_sidetone_dev = false;
+        break;
+    }
+
+    return is_sidetone_dev;
+}
+
+void voice_set_sidetone(struct audio_device *adev,
+        snd_device_t out_snd_device, bool enable)
+{
+    char mixer_path[MIXER_PATH_MAX_LENGTH];
+    bool is_sidetone_dev;
+
+    ALOGD("%s: %s, out_snd_device: %d\n",
+          __func__, (enable ? "enable" : "disable"),
+          out_snd_device);
+
+    is_sidetone_dev = voice_is_sidetone_device(out_snd_device, mixer_path);
+
+    if (!is_sidetone_dev) {
+        ALOGD("%s: device %d does not support sidetone\n",
+              __func__, out_snd_device);
+        return;
+    }
+
+    ALOGD("%s: sidetone out device = %s\n",
+          __func__, mixer_path);
+
+    if (enable)
+        audio_route_apply_and_update_path(adev->audio_route, mixer_path);
+    else
+        audio_route_reset_and_update_path(adev->audio_route, mixer_path);
+
+    return;
+}
+
 int voice_stop_usecase(struct audio_device *adev, audio_usecase_t usecase_id)
 {
-    int ret = 0;
+    int  ret = 0;
     struct audio_usecase *uc_info;
     struct voice_session *session = NULL;
 
@@ -70,9 +123,18 @@ int voice_stop_usecase(struct audio_device *adev, audio_usecase_t usecase_id)
         return -EINVAL;
     }
 
+    uc_info = get_usecase_from_list(adev, usecase_id);
+    if (uc_info == NULL) {
+        ALOGE("%s: Could not find the usecase (%d) in the list",
+              __func__, usecase_id);
+        return -EINVAL;
+    }
+
     session->state.current = CALL_INACTIVE;
-    if (adev->mode == AUDIO_MODE_NORMAL)
-        adev->voice.is_in_call = false;
+
+    /* Disable sidetone only when no calls are active */
+    if (!voice_is_call_state_active(adev))
+        voice_set_sidetone(adev, uc_info->out_snd_device, false);
 
     ret = platform_stop_voice_call(adev->platform, session->vsid);
 
@@ -84,13 +146,6 @@ int voice_stop_usecase(struct audio_device *adev, audio_usecase_t usecase_id)
     if (session->pcm_tx) {
         pcm_close(session->pcm_tx);
         session->pcm_tx = NULL;
-    }
-
-    uc_info = get_usecase_from_list(adev, usecase_id);
-    if (uc_info == NULL) {
-        ALOGE("%s: Could not find the usecase (%d) in the list",
-              __func__, usecase_id);
-        return -EINVAL;
     }
 
     /* 2. Get and set stream specific mixer controls */
@@ -109,7 +164,7 @@ int voice_stop_usecase(struct audio_device *adev, audio_usecase_t usecase_id)
 
 int voice_start_usecase(struct audio_device *adev, audio_usecase_t usecase_id)
 {
-    int ret = 0;
+    int  ret = 0;
     struct audio_usecase *uc_info;
     int pcm_dev_rx_id, pcm_dev_tx_id;
     uint32_t sample_rate = 8000;
@@ -158,16 +213,7 @@ int voice_start_usecase(struct audio_device *adev, audio_usecase_t usecase_id)
     }
     ALOGD("voice_config.rate %d\n", voice_config.rate);
 
-    ALOGV("%s: Opening PCM playback device card_id(%d) device_id(%d)",
-          __func__, adev->snd_card, pcm_dev_rx_id);
-    session->pcm_rx = pcm_open(adev->snd_card,
-                               pcm_dev_rx_id,
-                               PCM_OUT, &voice_config);
-    if (session->pcm_rx && !pcm_is_ready(session->pcm_rx)) {
-        ALOGE("%s: %s", __func__, pcm_get_error(session->pcm_rx));
-        ret = -EIO;
-        goto error_start_voice;
-    }
+    voice_set_mic_mute(adev, adev->voice.mic_mute);
 
     ALOGV("%s: Opening PCM capture device card_id(%d) device_id(%d)",
           __func__, adev->snd_card, pcm_dev_tx_id);
@@ -179,8 +225,24 @@ int voice_start_usecase(struct audio_device *adev, audio_usecase_t usecase_id)
         ret = -EIO;
         goto error_start_voice;
     }
-    pcm_start(session->pcm_rx);
+
+    ALOGV("%s: Opening PCM playback device card_id(%d) device_id(%d)",
+          __func__, adev->snd_card, pcm_dev_rx_id);
+    session->pcm_rx = pcm_open(adev->snd_card,
+                               pcm_dev_rx_id,
+                               PCM_OUT, &voice_config);
+    if (session->pcm_rx && !pcm_is_ready(session->pcm_rx)) {
+        ALOGE("%s: %s", __func__, pcm_get_error(session->pcm_rx));
+        ret = -EIO;
+        goto error_start_voice;
+    }
+
     pcm_start(session->pcm_tx);
+    pcm_start(session->pcm_rx);
+
+    /* Enable sidetone only when no calls are already active */
+    if (!voice_is_call_state_active(adev))
+        voice_set_sidetone(adev, uc_info->out_snd_device, true);
 
     voice_set_volume(adev, adev->voice.volume);
 
@@ -222,11 +284,16 @@ bool voice_is_in_call(struct audio_device *adev)
 bool voice_is_in_call_rec_stream(struct stream_in *in)
 {
     bool in_call_rec = false;
-    int ret = 0;
 
-    ret = voice_extn_is_in_call_rec_stream(in, &in_call_rec);
-    if (ret == -ENOSYS) {
-        in_call_rec = false;
+    if (!in) {
+       ALOGE("%s: input stream is NULL", __func__);
+       return in_call_rec;
+    }
+
+    if(in->source == AUDIO_SOURCE_VOICE_DOWNLINK ||
+       in->source == AUDIO_SOURCE_VOICE_UPLINK ||
+       in->source == AUDIO_SOURCE_VOICE_CALL) {
+       in_call_rec = true;
     }
 
     return in_call_rec;
@@ -288,6 +355,18 @@ int voice_check_and_set_incall_rec_usecase(struct audio_device *adev,
                                                        session_id, rec_mode);
         ALOGV("%s: Update usecase to %d",__func__, in->usecase);
     } else {
+        /*
+         * Reject the recording instances, where the recording is started
+         * with In-call voice recording source types but voice call is not
+         * active by the time input is started
+         */
+        if ((in->source == AUDIO_SOURCE_VOICE_UPLINK) ||
+            (in->source == AUDIO_SOURCE_VOICE_DOWNLINK) ||
+            (in->source == AUDIO_SOURCE_VOICE_CALL)) {
+            ret = -EINVAL;
+            ALOGE("%s: As voice call is not active, Incall rec usecase can't be \
+                   selected for requested source:%d",__func__, in->source);
+        }
         ALOGV("%s: voice call not active", __func__);
     }
 
@@ -307,6 +386,41 @@ int voice_check_and_stop_incall_rec_usecase(struct audio_device *adev,
     }
 
     return ret;
+}
+
+snd_device_t voice_get_incall_rec_snd_device(snd_device_t in_snd_device)
+{
+    snd_device_t incall_record_device = in_snd_device;
+
+    /*
+     * For incall recording stream, AUDIO_COPP topology will be picked up
+     * from the calibration data of the input sound device which is nothing
+     * but the voice call's input device. But there are requirements to use
+     * AUDIO_COPP_MONO topology even if the voice call's input device is
+     * different. Hence override the input device with the one which uses
+     * the AUDIO_COPP_MONO topology.
+     */
+    switch(in_snd_device) {
+    case SND_DEVICE_IN_HANDSET_MIC:
+    case SND_DEVICE_IN_VOICE_DMIC:
+    case SND_DEVICE_IN_AANC_HANDSET_MIC:
+        incall_record_device = SND_DEVICE_IN_HANDSET_MIC;
+        break;
+    case SND_DEVICE_IN_VOICE_SPEAKER_MIC:
+    case SND_DEVICE_IN_VOICE_SPEAKER_DMIC:
+    case SND_DEVICE_IN_VOICE_SPEAKER_DMIC_BROADSIDE:
+    case SND_DEVICE_IN_VOICE_SPEAKER_QMIC:
+        incall_record_device = SND_DEVICE_IN_VOICE_SPEAKER_MIC;
+        break;
+    default:
+        incall_record_device = in_snd_device;
+    }
+
+    ALOGD("%s: in_snd_device(%d: %s) incall_record_device(%d: %s)", __func__,
+          in_snd_device, platform_get_snd_device_name(in_snd_device),
+          incall_record_device,  platform_get_snd_device_name(incall_record_device));
+
+    return incall_record_device;
 }
 
 int voice_check_and_set_incall_music_usecase(struct audio_device *adev,
@@ -373,11 +487,11 @@ int voice_start_call(struct audio_device *adev)
 {
     int ret = 0;
 
+    adev->voice.in_call = true;
     ret = voice_extn_start_call(adev);
     if (ret == -ENOSYS) {
         ret = voice_start_usecase(adev, USECASE_VOICE_CALL);
     }
-    adev->voice.in_call = true;
 
     return ret;
 }

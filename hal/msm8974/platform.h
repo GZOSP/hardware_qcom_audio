@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2013 The Android Open Source Project
@@ -32,14 +32,39 @@ enum {
     FLUENCE_BROADSIDE = 0x2,
 };
 
+enum {
+    SOURCE_MONO_MIC  = 0x1,            /* Target contains 1 mic */
+    SOURCE_DUAL_MIC  = 0x2,            /* Target contains 2 mics */
+    SOURCE_THREE_MIC = 0x4,            /* Target contains 3 mics */
+    SOURCE_QUAD_MIC  = 0x8,            /* Target contains 4 mics */
+};
+
+enum {
+    SPKR_1,
+    SPKR_2
+};
+
 /*
  * Below are the devices for which is back end is same, SLIMBUS_0_RX.
  * All these devices are handled by the internal HW codec. We can
- * enable any one of these devices at any time
+ * enable any one of these devices at any time. An exception here is
+ * 44.1k headphone which uses different backend. This is filtered
+ * as different hal internal device in the code but remains same
+ * as standard android device AUDIO_DEVICE_OUT_WIRED_HEADPHONE
+ * for other layers.
  */
 #define AUDIO_DEVICE_OUT_ALL_CODEC_BACKEND \
     (AUDIO_DEVICE_OUT_EARPIECE | AUDIO_DEVICE_OUT_SPEAKER | \
      AUDIO_DEVICE_OUT_WIRED_HEADSET | AUDIO_DEVICE_OUT_WIRED_HEADPHONE)
+
+/*
+ * Below are the input devices for which back end is same, SLIMBUS_0_TX.
+ * All these devices are handled by the internal HW codec. We can
+ * enable any one of these devices at any time
+ */
+#define AUDIO_DEVICE_IN_ALL_CODEC_BACKEND \
+    (AUDIO_DEVICE_IN_BUILTIN_MIC | AUDIO_DEVICE_IN_BACK_MIC | \
+     AUDIO_DEVICE_IN_WIRED_HEADSET | AUDIO_DEVICE_IN_VOICE_CALL) & ~AUDIO_DEVICE_BIT_IN
 
 /* Sound devices specific to the platform
  * The DEVICE_OUT_* and DEVICE_IN_* should be mapped to these sound
@@ -57,18 +82,18 @@ enum {
     SND_DEVICE_OUT_SPEAKER_EXTERNAL_2,
     SND_DEVICE_OUT_SPEAKER_REVERSE,
     SND_DEVICE_OUT_HEADPHONES,
+    SND_DEVICE_OUT_HEADPHONES_44_1,
     SND_DEVICE_OUT_SPEAKER_AND_HEADPHONES,
     SND_DEVICE_OUT_SPEAKER_AND_HEADPHONES_EXTERNAL_1,
     SND_DEVICE_OUT_SPEAKER_AND_HEADPHONES_EXTERNAL_2,
     SND_DEVICE_OUT_VOICE_HANDSET,
     SND_DEVICE_OUT_VOICE_SPEAKER,
+    SND_DEVICE_OUT_VOICE_SPEAKER_2,
     SND_DEVICE_OUT_VOICE_HEADPHONES,
     SND_DEVICE_OUT_HDMI,
     SND_DEVICE_OUT_SPEAKER_AND_HDMI,
     SND_DEVICE_OUT_BT_SCO,
     SND_DEVICE_OUT_BT_SCO_WB,
-    SND_DEVICE_OUT_BT_A2DP,
-    SND_DEVICE_OUT_SPEAKER_AND_BT_A2DP,
     SND_DEVICE_OUT_VOICE_TTY_FULL_HEADPHONES,
     SND_DEVICE_OUT_VOICE_TTY_VCO_HEADPHONES,
     SND_DEVICE_OUT_VOICE_TTY_HCO_HANDSET,
@@ -85,6 +110,7 @@ enum {
     SND_DEVICE_OUT_ANC_HANDSET,
     SND_DEVICE_OUT_SPEAKER_PROTECTED,
     SND_DEVICE_OUT_VOICE_SPEAKER_PROTECTED,
+    SND_DEVICE_OUT_VOICE_SPEAKER_2_PROTECTED,
     SND_DEVICE_OUT_END,
 
     /*
@@ -138,11 +164,19 @@ enum {
     SND_DEVICE_IN_HANDSET_STEREO_DMIC,
     SND_DEVICE_IN_SPEAKER_STEREO_DMIC,
     SND_DEVICE_IN_CAPTURE_VI_FEEDBACK,
+    SND_DEVICE_IN_CAPTURE_VI_FEEDBACK_MONO_1,
+    SND_DEVICE_IN_CAPTURE_VI_FEEDBACK_MONO_2,
     SND_DEVICE_IN_VOICE_SPEAKER_DMIC_BROADSIDE,
     SND_DEVICE_IN_SPEAKER_DMIC_BROADSIDE,
     SND_DEVICE_IN_SPEAKER_DMIC_AEC_BROADSIDE,
     SND_DEVICE_IN_SPEAKER_DMIC_NS_BROADSIDE,
     SND_DEVICE_IN_SPEAKER_DMIC_AEC_NS_BROADSIDE,
+    SND_DEVICE_IN_HANDSET_QMIC,
+    SND_DEVICE_IN_SPEAKER_QMIC_AEC,
+    SND_DEVICE_IN_SPEAKER_QMIC_NS,
+    SND_DEVICE_IN_SPEAKER_QMIC_AEC_NS,
+    SND_DEVICE_IN_THREE_MIC,
+    SND_DEVICE_IN_HANDSET_TMIC,
     SND_DEVICE_IN_UNPROCESSED_MIC,
     SND_DEVICE_IN_UNPROCESSED_STEREO_MIC,
     SND_DEVICE_IN_UNPROCESSED_THREE_MIC,
@@ -154,7 +188,17 @@ enum {
 
 };
 
-#define DEFAULT_OUTPUT_SAMPLING_RATE 48000
+#define DEFAULT_OUTPUT_SAMPLING_RATE    48000
+#define OUTPUT_SAMPLING_RATE_44100      44100
+
+enum {
+    DEFAULT_CODEC_BACKEND,
+    HEADPHONE_44_1_BACKEND,
+    MAX_CODEC_BACKENDS
+};
+
+#define AUDIO_PARAMETER_KEY_NATIVE_AUDIO "audio.nat.codec.enabled"
+#define AUDIO_PARAMETER_KEY_TRUE_32_BIT "true_32_bit"
 
 #define ALL_SESSION_VSID                0xFFFFFFFF
 #define DEFAULT_MUTE_RAMP_DURATION_MS   20
@@ -197,6 +241,7 @@ enum {
 #define DEEP_BUFFER_PCM_DEVICE 0
 #define AUDIO_RECORD_PCM_DEVICE 0
 #define MULTIMEDIA2_PCM_DEVICE 1
+#define MULTIMEDIA3_PCM_DEVICE 4
 #define FM_PLAYBACK_PCM_DEVICE 5
 #define FM_CAPTURE_PCM_DEVICE  6
 #define HFP_PCM_RX 5
@@ -232,7 +277,7 @@ enum {
 #define PLAYBACK_OFFLOAD_DEVICE8 38
 #define PLAYBACK_OFFLOAD_DEVICE9 39
 #endif
-#ifdef PLATFORM_MSM8994
+#if defined (PLATFORM_MSM8994) || defined (PLATFORM_MSM8996)
 #define PLAYBACK_OFFLOAD_DEVICE2 17
 #define PLAYBACK_OFFLOAD_DEVICE3 18
 #define PLAYBACK_OFFLOAD_DEVICE4 37
@@ -243,6 +288,9 @@ enum {
 #define PLAYBACK_OFFLOAD_DEVICE9 42
 #endif
 #endif
+
+// for DIRECT_PCM
+#define PLAYBACK_OFFLOAD_DEVICE2 17
 
 #define COMPRESS_VOIP_CALL_PCM_DEVICE 3
 
@@ -320,9 +368,15 @@ enum {
 #define FM_RX_VOLUME "Quat MI2S FM RX Volume"
 #elif PLATFORM_MSM8994
 #define FM_RX_VOLUME "PRI MI2S LOOPBACK Volume"
+#elif PLATFORM_MSM8996
+#define FM_RX_VOLUME "Tert MI2S LOOPBACK Volume"
 #else
 #define FM_RX_VOLUME "Internal FM RX Volume"
 #endif
+
+#define PLATFORM_MAX_MIC_COUNT "input_mic_max_count"
+#define PLATFORM_DEFAULT_MIC_COUNT 2
+#define PLATFORM_DEFAULT_EXTERNAL_CODEC_MIC_COUNT 4
 
 #define LIB_CSD_CLIENT "libcsd-client.so"
 /* CSD-CLIENT related functions */
@@ -363,6 +417,12 @@ struct csd_data {
     get_sample_rate_t get_sample_rate;
 };
 
+/* HDMI Passthrough defines */
+enum {
+    LEGACY_PCM = 0,
+    PASSTHROUGH,
+    PASSTHROUGH_CONVERT
+};
 /*
  * ID for setting mute and lateny on the device side
  * through Device PP Params mixer control.
@@ -376,5 +436,11 @@ struct audio_device_to_audio_interface {
     audio_devices_t device;
     char device_name[100];
     char interface_name[100];
+};
+
+struct speaker_device_to_tz_names {
+    snd_device_t snd_device;
+    char spkr_1_tz_name[100];
+    char spkr_2_tz_name[100];
 };
 #endif // QCOM_AUDIO_PLATFORM_H

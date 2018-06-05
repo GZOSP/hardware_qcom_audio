@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2013 The Android Open Source Project
@@ -15,6 +15,24 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * This file was modified by DTS, Inc. The portions of the
+ * code modified by DTS, Inc are copyrighted and
+ * licensed separately, as follows:
+ *
+ * (C) 2014 DTS, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #ifndef AUDIO_EXTN_H
@@ -22,20 +40,8 @@
 
 #include <cutils/str_parms.h>
 
-#if 0
-#define AUDIO_FORMAT_PCM_OFFLOAD 0x17000000UL
-#define AUDIO_FORMAT_PCM_16_BIT_OFFLOAD (AUDIO_FORMAT_PCM_OFFLOAD | AUDIO_FORMAT_PCM_SUB_16_BIT)
-#define AUDIO_FORMAT_PCM_24_BIT_OFFLOAD (AUDIO_FORMAT_PCM_OFFLOAD | AUDIO_FORMAT_PCM_SUB_8_24_BIT)
-#define AUDIO_OFFLOAD_CODEC_FORMAT  "music_offload_codec_format"
-#define audio_is_offload_pcm(format) (0)
-#endif
-
 #ifndef AFE_PROXY_ENABLED
 #define AUDIO_DEVICE_OUT_PROXY 0x40000
-#endif
-
-#ifndef COMPRESS_VOIP_ENABLED
-#define AUDIO_OUTPUT_FLAG_VOIP_RX 0x4000
 #endif
 
 #ifndef INCALL_MUSIC_ENABLED
@@ -63,6 +69,16 @@
 #define AUDIO_FORMAT_APE 0x1D000000UL
 #endif
 
+#ifndef AAC_ADTS_OFFLOAD_ENABLED
+#define AUDIO_FORMAT_AAC_ADTS 0x1E000000UL
+#define AUDIO_FORMAT_AAC_ADTS_LC   (AUDIO_FORMAT_AAC_ADTS |\
+                                      AUDIO_FORMAT_AAC_SUB_LC)
+#define AUDIO_FORMAT_AAC_ADTS_HE_V1 (AUDIO_FORMAT_AAC_ADTS |\
+                                      AUDIO_FORMAT_AAC_SUB_HE_V1)
+#define AUDIO_FORMAT_AAC_ADTS_HE_V2  (AUDIO_FORMAT_AAC_ADTS |\
+                                      AUDIO_FORMAT_AAC_SUB_HE_V2)
+#endif
+
 #ifndef COMPRESS_METADATA_NEEDED
 #define audio_extn_parse_compress_metadata(out, parms) (0)
 #else
@@ -70,10 +86,11 @@ int audio_extn_parse_compress_metadata(struct stream_out *out,
                                        struct str_parms *parms);
 #endif
 
-#ifdef PCM_OFFLOAD_ENABLED_24
-#define PCM_OUTPUT_BIT_WIDTH (config->offload_info.bit_width)
+#ifdef AUDIO_EXTN_FORMATS_ENABLED
+#define AUDIO_OUTPUT_BIT_WIDTH ((config->offload_info.bit_width == 32) ? 24\
+                                   :config->offload_info.bit_width)
 #else
-#define PCM_OUTPUT_BIT_WIDTH (CODEC_BACKEND_DEFAULT_BIT_WIDTH)
+#define AUDIO_OUTPUT_BIT_WIDTH (CODEC_BACKEND_DEFAULT_BIT_WIDTH)
 #endif
 
 #define MAX_LENGTH_MIXER_CONTROL_IN_INT                  (128)
@@ -93,6 +110,14 @@ void audio_extn_get_parameters(const struct audio_device *adev,
 bool audio_extn_get_anc_enabled(void);
 bool audio_extn_should_use_fb_anc(void);
 bool audio_extn_should_use_handset_anc(int in_channels);
+#endif
+
+#ifndef VBAT_MONITOR_ENABLED
+#define audio_extn_is_vbat_enabled()                     (0)
+#define audio_extn_can_use_vbat()                        (0)
+#else
+bool audio_extn_is_vbat_enabled(void);
+bool audio_extn_can_use_vbat(void);
 #endif
 
 #ifndef FLUENCE_ENABLED
@@ -138,32 +163,40 @@ void audio_extn_usb_set_proxy_sound_card(uint32_t sndcard_idx);
 bool audio_extn_usb_is_proxy_inuse();
 #endif
 
-#ifndef SPLIT_A2DP_ENABLED
-#define audio_extn_a2dp_init()                       (0)
-#define audio_extn_a2dp_start_playback()             (0)
-#define audio_extn_a2dp_stop_playback()              (0)
-#define audio_extn_a2dp_set_parameters(parms)      (0)
-#else
-void audio_extn_a2dp_init();
-void audio_extn_a2dp_start_playback();
-void audio_extn_a2dp_stop_playback();
-void audio_extn_a2dp_set_parameters(struct str_parms *parms);
-#endif
-
 #ifndef SSR_ENABLED
-#define audio_extn_ssr_init(in)                       (0)
+#define audio_extn_ssr_check_usecase(in)      (0)
+#define audio_extn_ssr_set_usecase(in, config, update_params)      (0)
+#define audio_extn_ssr_init(in, num_out_chan)         (0)
 #define audio_extn_ssr_deinit()                       (0)
 #define audio_extn_ssr_update_enabled()               (0)
 #define audio_extn_ssr_get_enabled()                  (0)
 #define audio_extn_ssr_read(stream, buffer, bytes)    (0)
+#define audio_extn_ssr_set_parameters(adev, parms)    (0)
+#define audio_extn_ssr_get_parameters(adev, parms, reply) (0)
+#define audio_extn_ssr_get_stream()                   (0)
 #else
-int32_t audio_extn_ssr_init(struct stream_in *in);
+bool audio_extn_ssr_check_usecase(struct stream_in *in);
+int audio_extn_ssr_set_usecase(struct stream_in *in,
+                                         struct audio_config *config,
+                                         bool *update_params);
+int32_t audio_extn_ssr_init(struct stream_in *in,
+                            int num_out_chan);
 int32_t audio_extn_ssr_deinit();
 void audio_extn_ssr_update_enabled();
 bool audio_extn_ssr_get_enabled();
 int32_t audio_extn_ssr_read(struct audio_stream_in *stream,
                        void *buffer, size_t bytes);
+void audio_extn_ssr_set_parameters(struct audio_device *adev,
+                                   struct str_parms *parms);
+void audio_extn_ssr_get_parameters(const struct audio_device *adev,
+                                   struct str_parms *query,
+                                   struct str_parms *reply);
+struct stream_in *audio_extn_ssr_get_stream();
 #endif
+int audio_extn_check_and_set_multichannel_usecase(struct audio_device *adev,
+                                                  struct stream_in *in,
+                                                  struct audio_config *config,
+                                                  bool *update_params);
 
 #ifndef HW_VARIANTS_ENABLED
 #define hw_info_init(snd_card_name)                  (0)
@@ -210,6 +243,7 @@ void audio_extn_listen_set_parameters(struct audio_device *adev,
 #define audio_extn_sound_trigger_set_parameters(adev, parms)           (0)
 #define audio_extn_sound_trigger_check_and_get_session(in)             (0)
 #define audio_extn_sound_trigger_stop_lab(in)                          (0)
+#define audio_extn_sound_trigger_read(in, buffer, bytes)               (0)
 #else
 
 enum st_event_type {
@@ -230,6 +264,8 @@ void audio_extn_sound_trigger_set_parameters(struct audio_device *adev,
                                              struct str_parms *parms);
 void audio_extn_sound_trigger_check_and_get_session(struct stream_in *in);
 void audio_extn_sound_trigger_stop_lab(struct stream_in *in);
+int audio_extn_sound_trigger_read(struct stream_in *in, void *buffer,
+                                  size_t bytes);
 #endif
 
 #ifndef AUXPCM_BT_ENABLED
@@ -277,10 +313,35 @@ size_t audio_extn_compr_cap_read(struct stream_in *in,
 void audio_extn_compr_cap_deinit();
 #endif
 
+#ifndef DTS_EAGLE
+#define audio_extn_dts_eagle_set_parameters(adev, parms)     (0)
+#define audio_extn_dts_eagle_get_parameters(adev, query, reply) (0)
+#define audio_extn_dts_eagle_fade(adev, fade_in, out) (0)
+#define audio_extn_dts_create_state_notifier_node(stream_out) (0)
+#define audio_extn_dts_notify_playback_state(stream_out, has_video, sample_rate, \
+                                    channels, is_playing) (0)
+#define audio_extn_dts_remove_state_notifier_node(stream_out) (0)
+#define audio_extn_check_and_set_dts_hpx_state(adev)       (0)
+#else
+void audio_extn_dts_eagle_set_parameters(struct audio_device *adev,
+                                         struct str_parms *parms);
+int audio_extn_dts_eagle_get_parameters(const struct audio_device *adev,
+                  struct str_parms *query, struct str_parms *reply);
+int audio_extn_dts_eagle_fade(const struct audio_device *adev, bool fade_in, const struct stream_out *out);
+void audio_extn_dts_create_state_notifier_node(int stream_out);
+void audio_extn_dts_notify_playback_state(int stream_out, int has_video, int sample_rate,
+                                  int channels, int is_playing);
+void audio_extn_dts_remove_state_notifier_node(int stream_out);
+void audio_extn_check_and_set_dts_hpx_state(const struct audio_device *adev);
+#endif
+
 #if defined(DS1_DOLBY_DDP_ENABLED) || defined(DS1_DOLBY_DAP_ENABLED)
 void audio_extn_dolby_set_dmid(struct audio_device *adev);
 #else
 #define audio_extn_dolby_set_dmid(adev)                 (0)
+#define AUDIO_CHANNEL_OUT_PENTA (AUDIO_CHANNEL_OUT_QUAD | AUDIO_CHANNEL_OUT_FRONT_CENTER)
+#define AUDIO_CHANNEL_OUT_SURROUND (AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT | \
+                                    AUDIO_CHANNEL_OUT_FRONT_CENTER | AUDIO_CHANNEL_OUT_BACK_CENTER)
 #endif
 
 
@@ -314,6 +375,35 @@ int audio_extn_dolby_get_snd_codec_id(struct audio_device *adev,
 void audio_extn_ddp_set_parameters(struct audio_device *adev,
                                    struct str_parms *parms);
 void audio_extn_dolby_send_ddp_endp_params(struct audio_device *adev);
+
+#endif
+
+#ifndef HDMI_PASSTHROUGH_ENABLED
+#define audio_extn_dolby_update_passt_formats(adev, out)                   (0)
+#define audio_extn_dolby_update_passt_stream_configuration(adev, out)      (0)
+#define audio_extn_dolby_is_passt_convert_supported(adev, out)             (0)
+#define audio_extn_dolby_is_passt_supported(adev, out)                     (0)
+#define audio_extn_dolby_is_passthrough_stream(flags)                      (0)
+#define audio_extn_dolby_set_hdmi_config(adev, out)                        (0)
+#define audio_extn_dolby_get_passt_buffer_size(info)                       (0)
+#define audio_extn_dolby_set_passt_volume(out, mute)                       (0)
+#define audio_extn_dolby_set_passt_latency(out, latency)                   (0)
+#define AUDIO_OUTPUT_FLAG_COMPRESS_PASSTHROUGH  0x4000
+#else
+int audio_extn_dolby_update_passt_formats(struct audio_device *adev,
+                                          struct stream_out *out);
+bool audio_extn_dolby_is_passt_convert_supported(struct audio_device *adev,
+                                                 struct stream_out *out);
+bool audio_extn_dolby_is_passt_supported(struct audio_device *adev,
+                                         struct stream_out *out);
+void audio_extn_dolby_update_passt_stream_configuration(struct audio_device *adev,
+                                                 struct stream_out *out);
+bool audio_extn_dolby_is_passthrough_stream(int flags);
+int audio_extn_dolby_set_hdmi_config(struct audio_device *adev,
+                                     struct stream_out *out);
+int audio_extn_dolby_get_passt_buffer_size(audio_offload_info_t* info);
+int audio_extn_dolby_set_passt_volume(struct stream_out *out, int mute);
+int audio_extn_dolby_set_passt_latency(struct stream_out *out, int latency);
 #endif
 
 #ifndef HFP_ENABLED
@@ -360,10 +450,13 @@ void audio_extn_utils_update_stream_app_type_cfg(void *platform,
                                   audio_format_t format,
                                   uint32_t sample_rate,
                                   uint32_t bit_width,
+                                  audio_channel_mask_t channel_mask,
                                   struct stream_app_type_cfg *app_type_cfg);
-int audio_extn_utils_send_app_type_cfg(struct audio_device *adev, struct audio_usecase *usecase);
+int audio_extn_utils_send_app_type_cfg(struct audio_usecase *usecase);
 void audio_extn_utils_send_audio_calibration(struct audio_device *adev,
                                              struct audio_usecase *usecase);
+int audio_extn_utils_get_snd_card_num();
+
 #ifdef DS2_DOLBY_DAP_ENABLED
 #define LIB_DS2_DAP_HAL "vendor/lib/libhwdaphal.so"
 #define SET_HW_INFO_FUNC "dap_hal_set_hw_info"
@@ -403,12 +496,16 @@ typedef enum {
 #ifndef AUDIO_FORMAT_E_AC3_JOC
 #define AUDIO_FORMAT_E_AC3_JOC  0x19000000UL
 #endif
- 
 #ifndef AUDIO_FORMAT_DTS_LBR
 #define AUDIO_FORMAT_DTS_LBR 0x1E000000UL
 #endif
 
+int b64decode(char *inp, int ilen, uint8_t* outp);
+int b64encode(uint8_t *inp, int ilen, char* outp);
 int read_line_from_file(const char *path, char *buf, size_t count);
+audio_format_t pcm_format_to_hal(uint32_t pcm_format);
+uint32_t hal_format_to_pcm(audio_format_t hal_format);
+
 
 #ifndef KPI_OPTIMIZE_ENABLED
 #define audio_extn_perf_lock_init() (0)
@@ -419,4 +516,30 @@ int audio_extn_perf_lock_init(void);
 void audio_extn_perf_lock_acquire(void);
 void audio_extn_perf_lock_release(void);
 #endif /* KPI_OPTIMIZE_ENABLED */
+
+#ifndef AUDIO_EXTERNAL_HDMI_ENABLED
+#define setChannelStatus(out, buffer, bytes) (0)
+#else
+void setChannelStatus(struct stream_out *out, char * buffer, size_t bytes);
+#endif
+
+typedef void (* snd_mon_cb)(void * stream, struct str_parms * parms);
+#ifndef SND_MONITOR_ENABLED
+#define audio_extn_snd_mon_init()           (0)
+#define audio_extn_snd_mon_deinit()         (0)
+#define audio_extn_snd_mon_register_listener(stream, cb) (0)
+#define audio_extn_snd_mon_unregister_listener(stream) (0)
+#else
+int audio_extn_snd_mon_init();
+int audio_extn_snd_mon_deinit();
+int audio_extn_snd_mon_register_listener(void *stream, snd_mon_cb cb);
+int audio_extn_snd_mon_unregister_listener(void *stream);
+#endif
+
+#ifndef FM_POWER_OPT
+#define audio_extn_fm_set_parameters(adev, parms) (0)
+#else
+void audio_extn_fm_set_parameters(struct audio_device *adev,
+                                   struct str_parms *parms);
+#endif
 #endif /* AUDIO_EXTN_H */

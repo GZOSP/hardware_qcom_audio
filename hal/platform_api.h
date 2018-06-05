@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
  * Not a contribution.
  *
  * Copyright (C) 2013 The Android Open Source Project
@@ -24,22 +24,7 @@
 #define CODEC_BACKEND_DEFAULT_BIT_WIDTH 16
 #define CODEC_BACKEND_DEFAULT_SAMPLE_RATE 48000
 
-#define PCM_CHANNEL_FL    1  /* Front left channel.                           */
-#define PCM_CHANNEL_FR    2  /* Front right channel.                          */
-#define PCM_CHANNEL_FC    3  /* Front center channel.                         */
-#define PCM_CHANNEL_LS    4  /* Left surround channel.                        */
-#define PCM_CHANNEL_RS    5  /* Right surround channel.                       */
-#define PCM_CHANNEL_LFE   6  /* Low frequency effect channel.                 */
-#define PCM_CHANNEL_CS    7  /* Center surround channel; Rear center channel. */
-#define PCM_CHANNEL_LB    8  /* Left back channel; Rear left channel.         */
-#define PCM_CHANNEL_RB    9  /* Right back channel; Rear right channel.       */
-#define PCM_CHANNEL_TS   10  /* Top surround channel.                         */
-#define PCM_CHANNEL_CVH  11  /* Center vertical height channel.               */
-#define PCM_CHANNEL_MS   12  /* Mono surround channel.                        */
-#define PCM_CHANNEL_FLC  13  /* Front left of center.                         */
-#define PCM_CHANNEL_FRC  14  /* Front right of center.                        */
-#define PCM_CHANNEL_RLC  15  /* Rear left of center.                          */
-#define PCM_CHANNEL_RRC  16  /* Rear right of center.                         */
+enum card_status_t;
 
 void *platform_init(struct audio_device *adev);
 void platform_deinit(void *platform);
@@ -48,7 +33,7 @@ int platform_acdb_init(void *platform);
 const char *platform_get_snd_device_name(snd_device_t snd_device);
 int platform_get_snd_device_name_extn(void *platform, snd_device_t snd_device,
                                       char *device_name);
-void platform_add_backend_name(char *mixer_path, snd_device_t snd_device);
+void platform_add_backend_name(char *mixer_path, snd_device_t snd_device, struct audio_usecase *usecase);
 int platform_get_pcm_device_id(audio_usecase_t usecase, int device_type);
 int platform_get_snd_device_index(char *snd_device_index_name);
 int platform_set_fluence_type(void *platform, char *value);
@@ -57,10 +42,12 @@ int platform_set_snd_device_acdb_id(snd_device_t snd_device, unsigned int acdb_i
 int platform_get_snd_device_acdb_id(snd_device_t snd_device);
 int platform_set_snd_device_bit_width(snd_device_t snd_device, unsigned int bit_width);
 int platform_get_snd_device_bit_width(snd_device_t snd_device);
+int platform_set_native_support(bool codec_support);
+int platform_get_native_support();
+int platform_get_backend_index(snd_device_t snd_device);
 int platform_send_audio_calibration(void *platform, struct audio_usecase *usecase,
                                     int app_type, int sample_rate);
 int platform_get_default_app_type(void *platform);
-int platform_get_default_app_type_v2(void *platform, usecase_type_t  type);
 int platform_switch_voice_call_device_pre(void *platform);
 int platform_switch_voice_call_enable_device_config(void *platform,
                                                     snd_device_t out_snd_device,
@@ -77,7 +64,7 @@ int platform_set_voice_volume(void *platform, int volume);
 int platform_set_mic_mute(void *platform, bool state);
 int platform_get_sample_rate(void *platform, uint32_t *rate);
 int platform_set_device_mute(void *platform, bool state, char *dir);
-snd_device_t platform_get_output_snd_device(void *platform, audio_devices_t devices);
+snd_device_t platform_get_output_snd_device(void *platform, struct stream_out *out);
 snd_device_t platform_get_input_snd_device(void *platform, audio_devices_t out_device);
 int platform_set_hdmi_channels(void *platform, int channel_count);
 int platform_edid_get_max_channels(void *platform);
@@ -107,18 +94,40 @@ int platform_set_snd_device_name(snd_device_t snd_device, const char * name);
 /* From platform_info_parser.c */
 int platform_info_init(const char *filename);
 
+void platform_snd_card_update(void *platform, card_status_t scard_status);
 struct audio_offload_info_t;
 uint32_t platform_get_compress_offload_buffer_size(audio_offload_info_t* info);
 uint32_t platform_get_pcm_offload_buffer_size(audio_offload_info_t* info);
+uint32_t platform_get_compress_passthrough_buffer_size(audio_offload_info_t* info);
 
-bool platform_check_and_set_codec_backend_cfg(struct audio_device* adev, struct audio_usecase *usecase);
+bool platform_check_and_set_codec_backend_cfg(struct audio_device* adev,
+                   struct audio_usecase *usecase, snd_device_t snd_device);
 int platform_get_usecase_index(const char * usecase);
 int platform_set_usecase_pcm_id(audio_usecase_t usecase, int32_t type, int32_t pcm_id);
-void platform_set_echo_reference(void *platform, bool enable);
+void platform_set_echo_reference(struct audio_device *adev, bool enable, audio_devices_t out_device);
 void platform_get_device_to_be_id_map(int **be_id_map, int *length);
 
+int platform_set_channel_allocation(void *platform, int channel_alloc);
+int platform_get_edid_info(void *platform);
+int platform_set_channel_map(void *platform, int ch_count, char *ch_map,
+                             int snd_id);
+int platform_set_stream_channel_map(void *platform, audio_channel_mask_t channel_mask, int snd_id);
+int platform_set_edid_channels_configuration(void *platform, int channels);
+unsigned char platform_map_to_edid_format(int format);
+bool platform_is_edid_supported_format(void *platform, int format);
+void platform_cache_edid(void * platform);
+void platform_invalidate_edid(void * platform);
+int platform_set_hdmi_config(struct stream_out *out);
+int platform_set_device_params(struct stream_out *out, int param, int value);
 int platform_set_audio_device_interface(const char * device_name, const char *intf_name,
                                         const char * codec_type);
-int platform_set_channel_map(void *platform, int ch_count, char *ch_map, int snd_id);
-int platform_set_stream_channel_map(void *platform, audio_channel_mask_t channel_mask, int snd_id);
+int platform_set_spkr_device_tz_names(snd_device_t index,
+                                       const char *spkr_1_tz_name, const char *spkr_2_tz_name);
+const char *platform_get_spkr_1_tz_name(snd_device_t snd_device);
+const char *platform_get_spkr_2_tz_name(snd_device_t snd_device);
+bool platform_can_enable_spkr_prot_on_device(snd_device_t snd_device);
+int platform_get_wsa_mode(void *adev);
+void platform_set_gsm_mode(void *platform, bool enable);
+int platform_get_max_mic_count(void *platform);
+bool platform_supports_true_32bit();
 #endif // AUDIO_PLATFORM_API_H

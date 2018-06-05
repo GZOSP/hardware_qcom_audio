@@ -32,17 +32,42 @@ enum {
     FLUENCE_BROADSIDE = 0x2,
 };
 
+enum {
+    SOURCE_MONO_MIC  = 0x1,            /* Target contains 1 mic */
+    SOURCE_DUAL_MIC  = 0x2,            /* Target contains 2 mics */
+    SOURCE_THREE_MIC = 0x4,            /* Target contains 3 mics */
+    SOURCE_QUAD_MIC  = 0x8,            /* Target contains 4 mics */
+};
+
+enum {
+    SPKR_1,
+    SPKR_2
+};
+
 #define PLATFORM_IMAGE_NAME "modem"
 
 /*
  * Below are the devices for which is back end is same, SLIMBUS_0_RX.
  * All these devices are handled by the internal HW codec. We can
- * enable any one of these devices at any time.
+ * enable any one of these devices at any time. An exception here is
+ * 44.1k headphone which uses different backend. This is filtered
+ * as different hal internal device in the code but remains same
+ * as standard android device AUDIO_DEVICE_OUT_WIRED_HEADPHONE
+ * for other layers.
  */
 #define AUDIO_DEVICE_OUT_ALL_CODEC_BACKEND \
     (AUDIO_DEVICE_OUT_EARPIECE | AUDIO_DEVICE_OUT_SPEAKER | \
-     AUDIO_DEVICE_OUT_WIRED_HEADSET | AUDIO_DEVICE_OUT_WIRED_HEADPHONE | \
+     AUDIO_DEVICE_OUT_WIRED_HEADSET | AUDIO_DEVICE_OUT_WIRED_HEADPHONE|\
      AUDIO_DEVICE_OUT_LINE)
+
+/*
+ * Below are the input devices for which back end is same, SLIMBUS_0_TX.
+ * All these devices are handled by the internal HW codec. We can
+ * enable any one of these devices at any time
+ */
+#define AUDIO_DEVICE_IN_ALL_CODEC_BACKEND \
+    (AUDIO_DEVICE_IN_BUILTIN_MIC | AUDIO_DEVICE_IN_BACK_MIC | \
+     AUDIO_DEVICE_IN_WIRED_HEADSET | AUDIO_DEVICE_IN_VOICE_CALL) & ~AUDIO_DEVICE_BIT_IN
 
 /* Sound devices specific to the platform
  * The DEVICE_OUT_* and DEVICE_IN_* should be mapped to these sound
@@ -56,26 +81,35 @@ enum {
     SND_DEVICE_OUT_BEGIN = SND_DEVICE_MIN,
     SND_DEVICE_OUT_HANDSET = SND_DEVICE_OUT_BEGIN,
     SND_DEVICE_OUT_SPEAKER,
+    SND_DEVICE_OUT_SPEAKER_EXTERNAL_1,
+    SND_DEVICE_OUT_SPEAKER_EXTERNAL_2,
     SND_DEVICE_OUT_SPEAKER_REVERSE,
     SND_DEVICE_OUT_SPEAKER_WSA,
-    SND_DEVICE_OUT_HEADPHONES,
+    SND_DEVICE_OUT_SPEAKER_VBAT,
     SND_DEVICE_OUT_LINE,
+    SND_DEVICE_OUT_HEADPHONES,
+    SND_DEVICE_OUT_HEADPHONES_44_1,
     SND_DEVICE_OUT_SPEAKER_AND_HEADPHONES,
     SND_DEVICE_OUT_SPEAKER_AND_LINE,
+    SND_DEVICE_OUT_SPEAKER_AND_HEADPHONES_EXTERNAL_1,
+    SND_DEVICE_OUT_SPEAKER_AND_HEADPHONES_EXTERNAL_2,
     SND_DEVICE_OUT_VOICE_HANDSET,
     SND_DEVICE_OUT_VOICE_SPEAKER,
+    SND_DEVICE_OUT_VOICE_SPEAKER_2,
     SND_DEVICE_OUT_VOICE_SPEAKER_WSA,
+    SND_DEVICE_OUT_VOICE_SPEAKER_2_WSA,
+    SND_DEVICE_OUT_VOICE_SPEAKER_VBAT,
+    SND_DEVICE_OUT_VOICE_SPEAKER_2_VBAT,
     SND_DEVICE_OUT_VOICE_HEADPHONES,
     SND_DEVICE_OUT_VOICE_LINE,
     SND_DEVICE_OUT_HDMI,
     SND_DEVICE_OUT_SPEAKER_AND_HDMI,
     SND_DEVICE_OUT_BT_SCO,
     SND_DEVICE_OUT_BT_SCO_WB,
-    SND_DEVICE_OUT_BT_A2DP,
-    SND_DEVICE_OUT_SPEAKER_AND_BT_A2DP,
     SND_DEVICE_OUT_VOICE_TTY_FULL_HEADPHONES,
     SND_DEVICE_OUT_VOICE_TTY_VCO_HEADPHONES,
     SND_DEVICE_OUT_VOICE_TTY_HCO_HANDSET,
+    SND_DEVICE_OUT_VOICE_TX,
     SND_DEVICE_OUT_AFE_PROXY,
     SND_DEVICE_OUT_USB_HEADSET,
     SND_DEVICE_OUT_SPEAKER_AND_USB_HEADSET,
@@ -87,6 +121,11 @@ enum {
     SND_DEVICE_OUT_SPEAKER_AND_ANC_HEADSET,
     SND_DEVICE_OUT_ANC_HANDSET,
     SND_DEVICE_OUT_SPEAKER_PROTECTED,
+    SND_DEVICE_OUT_VOICE_SPEAKER_PROTECTED,
+    SND_DEVICE_OUT_SPEAKER_PROTECTED_VBAT,
+    SND_DEVICE_OUT_VOICE_SPEAKER_2_PROTECTED,
+    SND_DEVICE_OUT_VOICE_SPEAKER_PROTECTED_VBAT,
+    SND_DEVICE_OUT_VOICE_SPEAKER_2_PROTECTED_VBAT,
 #ifdef RECORD_PLAY_CONCURRENCY
     SND_DEVICE_OUT_VOIP_HANDSET,
     SND_DEVICE_OUT_VOIP_SPEAKER,
@@ -101,6 +140,7 @@ enum {
     /* Capture devices */
     SND_DEVICE_IN_BEGIN = SND_DEVICE_OUT_END,
     SND_DEVICE_IN_HANDSET_MIC  = SND_DEVICE_IN_BEGIN,
+    SND_DEVICE_IN_HANDSET_MIC_EXTERNAL,
     SND_DEVICE_IN_HANDSET_MIC_AEC,
     SND_DEVICE_IN_HANDSET_MIC_NS,
     SND_DEVICE_IN_HANDSET_MIC_AEC_NS,
@@ -136,6 +176,7 @@ enum {
     SND_DEVICE_IN_VOICE_REC_MIC_NS,
     SND_DEVICE_IN_VOICE_REC_DMIC_STEREO,
     SND_DEVICE_IN_VOICE_REC_DMIC_FLUENCE,
+    SND_DEVICE_IN_VOICE_RX,
     SND_DEVICE_IN_USB_HEADSET_MIC,
     SND_DEVICE_IN_CAPTURE_FM,
     SND_DEVICE_IN_AANC_HANDSET_MIC,
@@ -143,6 +184,8 @@ enum {
     SND_DEVICE_IN_HANDSET_STEREO_DMIC,
     SND_DEVICE_IN_SPEAKER_STEREO_DMIC,
     SND_DEVICE_IN_CAPTURE_VI_FEEDBACK,
+    SND_DEVICE_IN_CAPTURE_VI_FEEDBACK_MONO_1,
+    SND_DEVICE_IN_CAPTURE_VI_FEEDBACK_MONO_2,
     SND_DEVICE_IN_VOICE_SPEAKER_DMIC_BROADSIDE,
     SND_DEVICE_IN_SPEAKER_DMIC_BROADSIDE,
     SND_DEVICE_IN_SPEAKER_DMIC_AEC_BROADSIDE,
@@ -153,6 +196,8 @@ enum {
     SND_DEVICE_IN_SPEAKER_QMIC_AEC,
     SND_DEVICE_IN_SPEAKER_QMIC_NS,
     SND_DEVICE_IN_SPEAKER_QMIC_AEC_NS,
+    SND_DEVICE_IN_THREE_MIC,
+    SND_DEVICE_IN_HANDSET_TMIC,
     SND_DEVICE_IN_UNPROCESSED_MIC,
     SND_DEVICE_IN_UNPROCESSED_STEREO_MIC,
     SND_DEVICE_IN_UNPROCESSED_THREE_MIC,
@@ -165,9 +210,20 @@ enum {
 };
 
 #define DEFAULT_OUTPUT_SAMPLING_RATE 48000
+#define OUTPUT_SAMPLING_RATE_44100      44100
+#define MAX_PORT                        6
+#define ALL_CODEC_BACKEND_PORT          0
+#define HEADPHONE_44_1_BACKEND_PORT     5
+enum {
+    DEFAULT_CODEC_BACKEND,
+    HEADPHONE_44_1_BACKEND,
+    MAX_CODEC_BACKENDS
+};
+#define AUDIO_PARAMETER_KEY_NATIVE_AUDIO "audio.nat.codec.enabled"
+#define AUDIO_PARAMETER_KEY_TRUE_32_BIT "true_32_bit"
 
 #define ALL_SESSION_VSID                0xFFFFFFFF
-#define DEFAULT_MUTE_RAMP_DURATION      500
+#define DEFAULT_MUTE_RAMP_DURATION_MS   20
 #define DEFAULT_VOLUME_RAMP_DURATION_MS 20
 #define MIXER_PATH_MAX_LENGTH 100
 
@@ -184,8 +240,8 @@ enum {
  * We should take care of returning proper size when AudioFlinger queries for
  * the buffer size of an input/output stream
  */
-#define DEEP_BUFFER_OUTPUT_PERIOD_SIZE 960
-#define DEEP_BUFFER_OUTPUT_PERIOD_COUNT 5
+#define DEEP_BUFFER_OUTPUT_PERIOD_SIZE 1920
+#define DEEP_BUFFER_OUTPUT_PERIOD_COUNT 3
 #define LOW_LATENCY_OUTPUT_PERIOD_SIZE 240
 #define LOW_LATENCY_OUTPUT_PERIOD_COUNT 2
 
@@ -201,12 +257,17 @@ enum {
 #define AUDIO_CAPTURE_PERIOD_DURATION_MSEC 20
 #define AUDIO_CAPTURE_PERIOD_COUNT 2
 
+#define LOW_LATENCY_CAPTURE_SAMPLE_RATE 48000
+#define LOW_LATENCY_CAPTURE_PERIOD_SIZE 240
+#define LOW_LATENCY_CAPTURE_USE_CASE 1
+
 #define DEVICE_NAME_MAX_SIZE 128
 #define HW_INFO_ARRAY_MAX_SIZE 32
 
 #define DEEP_BUFFER_PCM_DEVICE 0
 #define AUDIO_RECORD_PCM_DEVICE 0
 #define MULTIMEDIA2_PCM_DEVICE 1
+#define MULTIMEDIA3_PCM_DEVICE 4
 #define FM_PLAYBACK_PCM_DEVICE 5
 #define FM_CAPTURE_PCM_DEVICE  6
 #define HFP_PCM_RX 5
@@ -216,8 +277,11 @@ enum {
 #define INCALL_MUSIC_UPLINK_PCM_DEVICE 1
 #define INCALL_MUSIC_UPLINK2_PCM_DEVICE 16
 #define SPKR_PROT_CALIB_RX_PCM_DEVICE 5
-#define SPKR_PROT_CALIB_TX_PCM_DEVICE 22
+#define SPKR_PROT_CALIB_TX_PCM_DEVICE 26
 #define PLAYBACK_OFFLOAD_DEVICE 9
+#define PLAYBACK_OFFLOAD_DEVICE2 24
+
+
 #define COMPRESS_VOIP_CALL_PCM_DEVICE 3
 
 /* Define macro for Internal FM volume mixer */
@@ -233,8 +297,13 @@ enum {
 #define QCHAT_CALL_PCM_DEVICE 26
 #define QCHAT_CALL_PCM_DEVICE_OF_EXT_CODEC 28
 #define VOWLAN_CALL_PCM_DEVICE 16
-#define VOICEMMODE1_CALL_PCM_DEVICE 27
-#define VOICEMMODE2_CALL_PCM_DEVICE 28
+
+#define AFE_PROXY_PLAYBACK_PCM_DEVICE 7
+#define AFE_PROXY_RECORD_PCM_DEVICE 8
+
+#define PLATFORM_MAX_MIC_COUNT "input_mic_max_count"
+#define PLATFORM_DEFAULT_EXTERNAL_CODEC_MIC_COUNT 4
+#define PLATFORM_DEFAULT_MIC_COUNT 2
 
 #define LIB_CSD_CLIENT "libcsd-client.so"
 /* CSD-CLIENT related functions */
@@ -243,8 +312,8 @@ typedef int (*deinit_t)();
 typedef int (*disable_device_t)();
 typedef int (*enable_device_config_t)(int, int);
 typedef int (*enable_device_t)(int, int, uint32_t);
-typedef int (*volume_t)(uint32_t, int);
-typedef int (*mic_mute_t)(uint32_t, int);
+typedef int (*volume_t)(uint32_t, int, uint16_t);
+typedef int (*mic_mute_t)(uint32_t, int, uint16_t);
 typedef int (*slow_talk_t)(uint32_t, uint8_t);
 typedef int (*start_voice_t)(uint32_t);
 typedef int (*stop_voice_t)(uint32_t);
@@ -275,6 +344,18 @@ struct csd_data {
 
 int platform_get_subsys_image_name (char *buf);
 
+/* HDMI Passthrough defines */
+enum {
+    LEGACY_PCM = 0,
+    PASSTHROUGH,
+    PASSTHROUGH_CONVERT
+};
+/*
+ * ID for setting mute and lateny on the device side
+ * through Device PP Params mixer control.
+ */
+#define DEVICE_PARAM_MUTE_ID    0
+#define DEVICE_PARAM_LATENCY_ID 1
 
 #define ENUM_TO_STRING(X) #X
 
@@ -282,5 +363,11 @@ struct audio_device_to_audio_interface {
     audio_devices_t device;
     char device_name[100];
     char interface_name[100];
+};
+
+struct speaker_device_to_tz_names {
+    snd_device_t snd_device;
+    char spkr_1_tz_name[100];
+    char spkr_2_tz_name[100];
 };
 #endif // QCOM_AUDIO_PLATFORM_H
