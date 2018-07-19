@@ -336,7 +336,7 @@ endif
 
 ifeq ($(TARGET_COMPILE_WITH_MSM_KERNEL),true)
         LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/techpack/audio/include
-        LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
+        LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 endif
 
 ifeq ($(strip $(AUDIO_FEATURE_ENABLED_EXT_HDMI)),true)
@@ -393,7 +393,7 @@ ifeq ($(strip $(AUDIO_FEATURE_ENABLED_DYNAMIC_LOG)), true)
     LOCAL_SHARED_LIBRARIES += libaudio_log_utils
 endif
 
-ifeq ($(strip $($AUDIO_FEATURE_ENABLED_DYNAMIC_ECNS)),true)
+ifeq ($(strip $(AUDIO_FEATURE_ENABLED_DYNAMIC_ECNS)),true)
     LOCAL_CFLAGS += -DDYNAMIC_ECNS_ENABLED
 endif
 
@@ -403,6 +403,15 @@ endif
 
 ifeq ($(strip $(AUDIO_FEATURE_ENABLED_USB_BURST_MODE)), true)
     LOCAL_CFLAGS += -DUSB_BURST_MODE_ENABLED
+endif
+
+ifeq ($(strip $(AUDIO_FEATURE_ENABLED_BATTERY_LISTENER)), true)
+    LOCAL_CFLAGS += -DBATTERY_LISTENER_ENABLED
+    LOCAL_SRC_FILES += audio_extn/battery_listener.cpp
+    LOCAL_SHARED_LIBRARIES += android.hardware.health@1.0 android.hardware.health@2.0 \
+                              libhidltransport libbase libhidlbase libhwbinder \
+                              libutils android.hardware.power@1.2
+    LOCAL_STATIC_LIBRARIES := libhealthhalutils
 endif
 
 LOCAL_CFLAGS += -Wall -Werror

@@ -41,6 +41,7 @@
 #include <cutils/str_parms.h>
 #include "adsp_hdlr.h"
 #include "ip_hdlr_intf.h"
+#include "battery_listener.h"
 
 #ifndef AFE_PROXY_ENABLED
 #define AUDIO_DEVICE_OUT_PROXY 0x40000
@@ -222,6 +223,7 @@ int32_t audio_extn_get_afe_proxy_channel_count();
 #define audio_extn_usb_get_sup_sample_rates(t, s, l)                   (0)
 #define audio_extn_usb_is_tunnel_supported()                           (0)
 #define audio_extn_usb_alive(adev)                                     (false)
+#define audio_extn_usb_connected(parms)                                (0)
 #undef USB_BURST_MODE_ENABLED
 #else
 void audio_extn_usb_init(void *adev);
@@ -241,6 +243,7 @@ int audio_extn_usb_get_max_bit_width(bool playback);
 int audio_extn_usb_get_sup_sample_rates(int type, uint32_t *sr, uint32_t l);
 bool audio_extn_usb_is_tunnel_supported();
 bool audio_extn_usb_alive(int card);
+bool audio_extn_usb_connected(struct str_parms *parms);
 #endif
 
 #ifndef USB_BURST_MODE_ENABLED
@@ -376,6 +379,7 @@ void audio_extn_listen_set_parameters(struct audio_device *adev,
 #define audio_extn_sound_trigger_deinit(adev)                          (0)
 #define audio_extn_sound_trigger_update_device_status(snd_dev, event)  (0)
 #define audio_extn_sound_trigger_update_stream_status(uc_info, event)  (0)
+#define audio_extn_sound_trigger_update_battery_status(charging)       (0)
 #define audio_extn_sound_trigger_set_parameters(adev, parms)           (0)
 #define audio_extn_sound_trigger_get_parameters(adev, query, reply)    (0)
 #define audio_extn_sound_trigger_check_and_get_session(in)             (0)
@@ -397,6 +401,7 @@ void audio_extn_sound_trigger_update_device_status(snd_device_t snd_device,
                                      st_event_type_t event);
 void audio_extn_sound_trigger_update_stream_status(struct audio_usecase *uc_info,
                                      st_event_type_t event);
+void audio_extn_sound_trigger_update_battery_status(bool charging);
 void audio_extn_sound_trigger_set_parameters(struct audio_device *adev,
                                              struct str_parms *parms);
 void audio_extn_sound_trigger_check_and_get_session(struct stream_in *in);
