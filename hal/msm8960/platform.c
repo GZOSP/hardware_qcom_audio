@@ -38,7 +38,7 @@
  * This is the sysfs path for the HDMI audio data block
  */
 #define AUDIO_DATA_BLOCK_PATH "/sys/class/graphics/fb1/audio_data_block"
-#define MIXER_XML_PATH "/system/etc/mixer_paths.xml"
+#define MIXER_XML_PATH "mixer_paths.xml"
 
 /*
  * This file will have a maximum of 38 bytes:
@@ -268,12 +268,35 @@ static int set_echo_reference(struct mixer *mixer, const char* ec_ref)
     return 0;
 }
 
+// Treblized config files will be located in /odm/etc or /vendor/etc.
+static const char *kConfigLocationList[] =
+        {"/odm/etc", "/vendor/etc", "/system/etc"};
+static const int kConfigLocationListSize =
+        (sizeof(kConfigLocationList) / sizeof(kConfigLocationList[0]));
+
+bool resolveConfigFile(char file_name[MIXER_PATH_MAX_LENGTH]) {
+    char full_config_path[MIXER_PATH_MAX_LENGTH];
+    for (int i = 0; i < kConfigLocationListSize; i++) {
+        snprintf(full_config_path,
+                 MIXER_PATH_MAX_LENGTH,
+                 "%s/%s",
+                 kConfigLocationList[i],
+                 file_name);
+        if (F_OK == access(full_config_path, 0)) {
+            strcpy(file_name, full_config_path);
+            return true;
+        }
+    }
+    return false;
+}
+
 void *platform_init(struct audio_device *adev)
 {
     char platform[PROPERTY_VALUE_MAX];
     char baseband[PROPERTY_VALUE_MAX];
     char value[PROPERTY_VALUE_MAX];
     struct platform_data *my_data;
+    char mixer_xml_file[MIXER_PATH_MAX_LENGTH] = MIXER_XML_PATH;
 
     adev->mixer = mixer_open(MIXER_CARD);
 
@@ -282,7 +305,8 @@ void *platform_init(struct audio_device *adev)
         return NULL;
     }
 
-    adev->audio_route = audio_route_init(MIXER_CARD, MIXER_XML_PATH);
+    resolveConfigFile(mixer_xml_file);
+    adev->audio_route = audio_route_init(MIXER_CARD, mixer_xml_file);
     if (!adev->audio_route) {
         ALOGE("%s: Failed to init audio route controls, aborting.", __func__);
         return NULL;
@@ -570,6 +594,11 @@ int platform_stop_voice_call(void *platform, uint32_t vsid __unused)
     }
 
     return ret;
+}
+
+int platform_set_mic_break_det(void *platform __unused, bool enable __unused)
+{
+    return 0;
 }
 
 void platform_set_speaker_gain_in_combo(struct audio_device *adev __unused,
@@ -1355,6 +1384,11 @@ int platform_get_microphones(void *platform __unused,
                              struct audio_microphone_characteristic_t *mic_array __unused,
                              size_t *mic_count __unused) {
     return -ENOSYS;
+}
+
+bool platform_set_microphone_map(void *platform __unused, snd_device_t in_snd_device __unused,
+                                 const struct mic_info *info __unused) {
+    return false;
 }
 
 int platform_get_active_microphones(void *platform __unused, unsigned int channels __unused,
