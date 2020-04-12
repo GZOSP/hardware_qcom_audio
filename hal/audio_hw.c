@@ -3761,8 +3761,15 @@ int start_output_stream(struct stream_out *out)
             out_set_pcm_volume(&out->stream, out->volume_l, out->volume_r);
         }
     } else {
-        platform_set_stream_channel_map(adev->platform, out->channel_mask,
-                   out->pcm_device_id, &out->channel_map_param.channel_map[0]);
+        /*
+         * set custom channel map if:
+         *   1. neither mono nor stereo clips i.e. channels > 2 OR
+         *   2. custom channel map has been set by client
+         * else default channel map of FC/FR/FL can always be set to DSP
+         */
+        if (popcount(out->channel_mask) > 2 || out->channel_map_param.channel_map[0])
+            platform_set_stream_channel_map(adev->platform, out->channel_mask,
+                       out->pcm_device_id, &out->channel_map_param.channel_map[0]);
         audio_enable_asm_bit_width_enforce_mode(adev->mixer,
                                                 adev->dsp_bit_width_enforce_mode,
                                                 true);
@@ -6321,9 +6328,6 @@ static int in_standby(struct audio_stream *stream)
             ATRACE_END();
             in->pcm = NULL;
         }
-
-        if (in->source == AUDIO_SOURCE_VOICE_COMMUNICATION)
-            adev->enable_voicerx = false;
 
         if (do_stop)
             status = stop_input_stream(in);
@@ -9145,6 +9149,10 @@ static void adev_close_input_stream(struct audio_hw_device *dev,
     pthread_mutex_lock(&adev->lock);
     if (in->usecase == USECASE_AUDIO_RECORD) {
         adev->pcm_record_uc_state = 0;
+    }
+
+    if (in->source == AUDIO_SOURCE_VOICE_COMMUNICATION) {
+        adev->enable_voicerx = false;
     }
 
     if (audio_extn_ssr_get_stream() == in) {
