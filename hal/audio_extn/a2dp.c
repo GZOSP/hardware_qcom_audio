@@ -209,6 +209,7 @@ typedef enum {
     APTX_AD_SR_UNCHANGED = 0x0,
     APTX_AD_48 = 0x1,  // 48 KHz default
     APTX_AD_44_1 = 0x2, // 44.1kHz
+    APTX_AD_96 = 0x3,  // 96KHz
 } enc_aptx_ad_s_rate;
 
 typedef void (*bt_audio_pre_init_t)(void);
@@ -1708,7 +1709,7 @@ static int update_aptx_ad_dsp_config(struct aptx_ad_enc_cfg_t *aptx_dsp_cfg,
              a2dp.enc_channels = CH_MONO;
              aptx_dsp_cfg->custom_cfg.num_channels = CH_MONO;
              aptx_dsp_cfg->custom_cfg.channel_mapping[0] = PCM_CHANNEL_C;
-            break;
+             break;
     }
     switch(aptx_dsp_cfg->aptx_ad_cfg.sampling_freq) {
         case APTX_AD_SR_UNCHANGED:
@@ -1720,7 +1721,7 @@ static int update_aptx_ad_dsp_config(struct aptx_ad_enc_cfg_t *aptx_dsp_cfg,
         case APTX_AD_44_1:
             a2dp.enc_sampling_rate = SAMPLING_RATE_441K;
             aptx_dsp_cfg->custom_cfg.sample_rate = SAMPLING_RATE_441K;
-        break;
+            break;
     }
     ALOGV("Successfully updated APTX AD enc format with \
                samplingrate: %d channels:%d",
@@ -1781,7 +1782,7 @@ static int update_aptx_ad_dsp_config_r2(struct aptx_ad_enc_cfg_r2_t *aptx_dsp_cf
              a2dp.enc_channels = CH_MONO;
              aptx_dsp_cfg->custom_cfg.num_channels = CH_MONO;
              aptx_dsp_cfg->custom_cfg.channel_mapping[0] = PCM_CHANNEL_C;
-            break;
+             break;
     }
     switch(aptx_dsp_cfg->aptx_ad_cfg.sampling_freq) {
         case APTX_AD_SR_UNCHANGED:
@@ -1793,7 +1794,11 @@ static int update_aptx_ad_dsp_config_r2(struct aptx_ad_enc_cfg_r2_t *aptx_dsp_cf
         case APTX_AD_44_1:
             a2dp.enc_sampling_rate = SAMPLING_RATE_441K;
             aptx_dsp_cfg->custom_cfg.sample_rate = SAMPLING_RATE_441K;
-        break;
+            break;
+        case APTX_AD_96:
+            a2dp.enc_sampling_rate = SAMPLING_RATE_96K;
+            aptx_dsp_cfg->custom_cfg.sample_rate = SAMPLING_RATE_96K;
+            break;
     }
     ALOGV("Successfully updated APTX AD enc format with \
                samplingrate: %d channels:%d",
@@ -2600,19 +2605,17 @@ static int reset_a2dp_source_dec_config_params()
     struct abr_dec_cfg_t dummy_reset_cfg;
     int ret = 0;
 
-    if (a2dp.abr_config.is_abr_enabled) {
-        ctl_dec_data = mixer_get_ctl_by_name(a2dp.adev->mixer, MIXER_SOURCE_DEC_CONFIG_BLOCK);
-        if (!ctl_dec_data) {
-            ALOGE("%s: ERROR A2DP decoder config mixer control not identifed", __func__);
-            return -EINVAL;
-        }
-        memset(&dummy_reset_cfg, 0x0, sizeof(dummy_reset_cfg));
-        ret = mixer_ctl_set_array(ctl_dec_data, (void *)&dummy_reset_cfg,
-                                  sizeof(dummy_reset_cfg));
-        if (ret != 0) {
-            ALOGE("%s: Failed to set dummy decoder config", __func__);
-            return ret;
-        }
+    ctl_dec_data = mixer_get_ctl_by_name(a2dp.adev->mixer, MIXER_SOURCE_DEC_CONFIG_BLOCK);
+    if (!ctl_dec_data) {
+        ALOGE("%s: ERROR A2DP decoder config mixer control not identifed", __func__);
+        return -EINVAL;
+    }
+    memset(&dummy_reset_cfg, 0x0, sizeof(dummy_reset_cfg));
+    ret = mixer_ctl_set_array(ctl_dec_data, (void *)&dummy_reset_cfg,
+                              sizeof(dummy_reset_cfg));
+    if (ret != 0) {
+        ALOGE("%s: Failed to set dummy decoder config", __func__);
+        return ret;
     }
 
     return ret;
